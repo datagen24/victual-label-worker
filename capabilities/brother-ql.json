@@ -1,0 +1,53 @@
+{
+  "driver_id": "brother.ql",
+  "schema_version": "1.0",
+  "contract_version": 1,
+  "connection_types": ["tcp", "ipp"],
+  "models": ["QL-820NWBc"],
+  "discriminator_properties": ["model", "connection_type", "media"],
+  "combination_binding": {"media": "media", "resolution_x": "resolution_x", "resolution_y": "resolution_y", "color_mode": "color_mode"},
+  "settings_schemas": [
+    {
+      "when": {"model": "QL-820NWBc"},
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["media", "resolution_x", "resolution_y", "color_mode"],
+        "properties": {
+          "media": {"type": "string", "enum": ["62", "62red"], "title": "Loaded tape"},
+          "resolution_x": {"type": "integer", "enum": [300, 600], "title": "Across the tape (dpi)"},
+          "resolution_y": {"type": "integer", "enum": [300, 600], "title": "Along the feed (dpi)"},
+          "color_mode": {"type": "string", "enum": ["monochrome", "black_red"], "title": "Colour"},
+          "tape_mm": {"type": "integer", "minimum": 12, "maximum": 62, "title": "Tape width (mm)"},
+          "auto_cut": {"type": "boolean", "title": "Cut between labels"},
+          "cut_at_end": {"type": "boolean", "title": "Cut after the last label"}
+        }
+      }
+    }
+  ],
+  "capability_document": {
+    "connection_types": ["tcp", "ipp"],
+    "models": ["QL-820NWBc"],
+    "combinations": [
+      {"model": "QL-820NWBc", "connection_type": "tcp", "media": "62", "resolution_x": 300, "resolution_y": 300, "color_mode": "monochrome",
+       "printable_width_um": 58928, "printable_length_um": {"min": 12700, "max": 254000}, "feed_direction": "length", "provenance": "demonstrated"},
+      {"model": "QL-820NWBc", "connection_type": "tcp", "media": "62", "resolution_x": 300, "resolution_y": 600, "color_mode": "monochrome",
+       "printable_width_um": 58928, "printable_length_um": {"min": 12700, "max": 254000}, "feed_direction": "length", "provenance": "advertised"},
+      {"model": "QL-820NWBc", "connection_type": "tcp", "media": "62red", "resolution_x": 300, "resolution_y": 300, "color_mode": "black_red",
+       "printable_width_um": 58928, "printable_length_um": {"min": 12700, "max": 254000}, "feed_direction": "length", "provenance": "demonstrated"},
+      {"model": "QL-820NWBc", "connection_type": "ipp", "media": "62", "resolution_x": 300, "resolution_y": 300, "color_mode": "monochrome",
+       "printable_width_um": 58928, "printable_length_um": {"min": 12700, "max": 254000}, "feed_direction": "length", "provenance": "demonstrated"},
+      {"model": "QL-820NWBc", "connection_type": "ipp", "media": "62red", "resolution_x": 300, "resolution_y": 300, "color_mode": "black_red",
+       "printable_width_um": 58928, "printable_length_um": {"min": 12700, "max": 254000}, "feed_direction": "length", "provenance": "demonstrated"}
+    ],
+    "artifact_forms": [
+      {"form": "raster/png-indexed;v=1", "applies_to": [{"connection_type": "tcp"}, {"connection_type": "ipp"}],
+       "geometry": "fixed_grid", "provenance": "demonstrated"}
+    ],
+    "completion_evidence": [
+      {"evidence": "transport", "applies_to": [{"connection_type": "tcp"}], "provenance": "demonstrated"},
+      {"evidence": "device_reported", "applies_to": [{"connection_type": "ipp"}], "provenance": "demonstrated"}
+    ],
+    "profile_contract_versions": [1]
+  }
+}

@@ -1,0 +1,63 @@
+# victual-label-worker
+
+The delivery worker [ADR-0019](https://github.com/datagen24/victual/blob/master/docs/adr/0019-label-printers-are-master-data.md)
+decides and [plan 25](https://github.com/datagen24/victual/blob/master/docs/plans/25-label-infrastructure.md)
+piece 4 specifies. It claims print jobs over Victual's authenticated pull API, verifies the
+artifact it was handed against the printer's resolved configuration, encodes it for the device
+and reports what happened.
+
+**It renders nothing.** Under [ADR-0021](https://github.com/datagen24/victual/blob/master/docs/adr/0021-label-templates-are-application-data.md)
+the template document is Victual's and the rasterizing belongs to
+[victual-label-renderer](https://github.com/datagen24/victual-label-renderer). What arrives
+here is a validated artifact and a manifest, and what this does is check the two against the
+device it is holding.
+
+**It holds no database credential and makes no database connection.** It authenticates with a
+typed API key over nine routes. A remote worker would otherwise need database reachability
+from wherever it sits, which is a worse thing to expose across a network boundary than an
+authenticated HTTP endpoint with a revocable key — and it would couple an independently
+released repository to Victual's migrations.
+
+## The rules it exists to keep
+
+- **The combination is revalidated immediately before device I/O.** Victual already refused
+  impossible jobs at enqueue; media and driver versions can change in between. A job whose
+  `(model, media, resolution, colour mode)` is not in the driver's `combinations` results in
+  **zero bytes reaching the device**, counted rather than assumed. That is not hypothetical:
+  on 2026-09-07 a two-colour job at 600 dpi was assembled and sent, and a QL-820NWBc refused
+  it with "Communications Command Error" although the capability document already said that
+  combination does not exist.
+- **The artifact's grid is the profile's.** `raster/png-indexed;v=1` declares
+  `geometry: fixed_grid`, so a raster whose width is not the device's printable dot count is a
+  refusal rather than a resize. Issue [#90](https://github.com/datagen24/victual/issues/90) is
+  what a resize costs: the prototype authored against `dots_total` while its library compared
+  against `dots_printable`, so every endless print was silently resampled — twice, at 600 dpi,
+  turning a 900-pixel label into 1,711 pixels.
+- **No automatic redispatch after a claimed attempt.** A failure is reported and ends there. A
+  person authorizes another attempt, naming the one they reviewed. A worker killed between
+  writing bytes and posting its result leaves an attempt that is *uncertain*, which is the
+  honest state: redispatching would guess, and it would guess in the direction that prints.
+- **An unreported outcome is not discarded because a credential was refused.** A 401 on
+  `result` means retry after rotating; it does not mean the outcome is lost.
+
+## Transports
+
+`tcp` — raw port 9100. Constants come from `brother_ql-inventree` 1.3 rather than being
+invented: 90 bytes per row and 400 invalidate bytes from its `models.py`, and 732/696/12/35 for
+label `62` from its `labels.py`. Delivery evidence over this path is `transport`: the device
+answers no status request, so *sent* is all it can honestly report.
+
+`ipp` — Internet Printing Protocol. The same byte stream as `application/octet-stream`, which
+the QL-820NWBc treats as a passthrough, plus `job-state` and `job-impressions-completed`
+afterwards — so this path can report `device_reported` where raw 9100 cannot. What IPP
+*declares* about the device understates it: it advertises `monochrome` and 300 dpi, and the
+identical two-colour raster printed anyway on 2026-09-07 and reached
+`job-state = completed`.
+
+## Running it
+
+```
+victual-label-worker --api https://victual.example --key-file /run/secrets/worker-key
+```
+
+`--health` exits 0 without contacting anything. `--once` claims at most one job and exits.

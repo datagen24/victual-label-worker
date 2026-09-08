@@ -1,0 +1,19 @@
+[package]
+name = "victual-label-worker"
+version = "0.1.0"
+edition = "2021"
+license = "BSD-3-Clause"
+description = "Label delivery worker for Victual"
+
+[dependencies]
+serde_json = "1"
+ureq = { version = "2", default-features = false, features = ["json", "tls"] }
+base64 = "0.22"
+flate2 = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"
