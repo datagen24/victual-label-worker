@@ -76,9 +76,7 @@ fn main() {
     let capabilities: Value = serde_json::from_str(include_str!("../capabilities/brother-ql.json"))
         .expect("the embedded capability document parses");
     if let Err(error) = api.register(serde_json::json!({
-        "definitions": [capabilities],
-        "profile_contract_versions": [1],
-        "artifact_forms": ["raster/png-indexed;v=1"],
+        "drivers": [capabilities],
     })) {
         eprintln!("register: {error}");
         std::process::exit(1);
