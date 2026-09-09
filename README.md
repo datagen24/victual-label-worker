@@ -54,6 +54,32 @@ afterwards — so this path can report `device_reported` where raw 9100 cannot. 
 identical two-colour raster printed anyway on 2026-09-07 and reached
 `job-state = completed`.
 
+## Physically demonstrated, 2026-09-09
+
+A label requested in Victual, rendered, verified, claimed here and printed on a QL-820NWBc at
+`10.130.30.94` over IPP: the device answered `job-state = 9` (completed) with
+`job-impressions-completed = 1`, which is `device_reported` evidence rather than "the bytes
+left here". It scanned back to the location it names, and it measured right way round at the
+size the profile fixes — which settles issue
+[#90](https://github.com/datagen24/victual/issues/90)'s rotation sign by a printed label
+rather than by reading.
+
+Two defects that run found, both in this repository and both fixed before anything printed:
+
+- **Two-colour was read from the artifact's ink rather than from the loaded roll.** A
+  black-only label on 62red tape was being sent as a single-plane stream, which is a media
+  mismatch — and a media mismatch is what "Wrong Roll Type" means. The resolved combination
+  decides now, so a black-only label on red tape sends an empty red plane.
+- **`--dry-run` consumed an authorization and reported nothing**, leaving a job that looked
+  attempted while no bytes had been sent. It records the attempt as failed saying so, and a
+  person authorizes the real one.
+
+The first attempt of the day declared plain `62` while 62red was loaded. The device latched
+into an error state and the next two jobs could not have succeeded whatever they carried,
+which is worth knowing: over raw 9100 the worker reported *sent* for all three, because
+*sent* is the most that path can honestly report. The IPP path is what turned a guess into a
+report.
+
 ## Running it
 
 ```

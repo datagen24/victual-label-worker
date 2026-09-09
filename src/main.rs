@@ -137,7 +137,12 @@ fn deliver(api: &api::Api, job: &Value, dry_run: bool) {
         return fail(detail);
     }
 
-    let two_colour = raster.has(RED);
+    // Two-colour is a property of the **loaded roll**, not of whether this particular label
+    // happens to paint any red. A QL with 62red tape expects the two-plane stream; handing it
+    // a single-plane one because today's label is black-only is a media mismatch, and a media
+    // mismatch is what "Wrong Roll Type" means. So the resolved combination decides, and a
+    // black-only label on red tape sends an empty red plane.
+    let two_colour = printer["settings"]["color_mode"].as_str() == Some("black_red");
     let connection = printer["connection"].as_str().unwrap_or_default().to_string();
     let connection_type = printer["connection_type"].as_str().unwrap_or("tcp");
 
@@ -147,9 +152,14 @@ fn deliver(api: &api::Api, job: &Value, dry_run: bool) {
     };
 
     if dry_run {
+        // A dry run has consumed an authorization and sent nothing, so it says so rather than
+        // leaving a job that looks attempted. Reporting the attempt as failed is the honest
+        // shape: no bytes reached the device, and a person authorizes the real one.
         println!("{}", serde_json::json!({
             "dry_run": true, "attempt_id": attempt, "byte_length": stream.len(),
             "two_colour": two_colour, "rows": raster.height, "connection_type": connection_type}));
+        let _ = api.result(attempt, "failed", serde_json::json!({
+            "error": "Dry run: the job was assembled and verified, and no bytes were sent"}));
         return;
     }
 

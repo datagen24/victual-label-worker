@@ -4,10 +4,10 @@
   "contract_version": 1,
   "discriminator_properties": [
     "model",
-    "connection_type",
     "media"
   ],
   "combination_binding": {
+    "model": "model",
     "media": "media",
     "resolution_x": "resolution_x",
     "resolution_y": "resolution_y",
@@ -19,22 +19,78 @@
   "settings_schemas": [
     {
       "when": {
-        "model": "QL-820NWBc"
+        "model": "QL-820NWBc",
+        "media": "62"
       },
       "schema": {
         "type": "object",
         "additionalProperties": false,
+        "properties": {
+          "media": {
+            "type": "string",
+            "enum": [
+              "62"
+            ],
+            "title": "Loaded tape"
+          },
+          "resolution_x": {
+            "type": "integer",
+            "enum": [
+              300,
+              600
+            ],
+            "title": "Across the tape (dpi)"
+          },
+          "resolution_y": {
+            "type": "integer",
+            "enum": [
+              300,
+              600
+            ],
+            "title": "Along the feed (dpi)"
+          },
+          "color_mode": {
+            "type": "string",
+            "enum": [
+              "monochrome"
+            ],
+            "title": "Colour"
+          },
+          "tape_mm": {
+            "type": "integer",
+            "minimum": 12,
+            "maximum": 62,
+            "title": "Tape width (mm)"
+          },
+          "auto_cut": {
+            "type": "boolean",
+            "title": "Cut between labels"
+          },
+          "cut_at_end": {
+            "type": "boolean",
+            "title": "Cut after the last label"
+          }
+        },
         "required": [
           "media",
           "resolution_x",
           "resolution_y",
           "color_mode"
-        ],
+        ]
+      }
+    },
+    {
+      "when": {
+        "model": "QL-820NWBc",
+        "media": "62red"
+      },
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
         "properties": {
           "media": {
             "type": "string",
             "enum": [
-              "62",
               "62red"
             ],
             "title": "Loaded tape"
@@ -77,7 +133,13 @@
             "type": "boolean",
             "title": "Cut after the last label"
           }
-        }
+        },
+        "required": [
+          "media",
+          "resolution_x",
+          "resolution_y",
+          "color_mode"
+        ]
       }
     }
   ],
@@ -103,7 +165,7 @@
           "max": 254000
         },
         "feed_direction": "y",
-        "provenance": "demonstrated"
+        "provenance": "advertised"
       },
       {
         "model": "QL-820NWBc",
@@ -148,7 +210,7 @@
           "max": 254000
         },
         "feed_direction": "y",
-        "provenance": "demonstrated"
+        "provenance": "advertised"
       },
       {
         "model": "QL-820NWBc",
