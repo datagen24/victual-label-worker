@@ -57,7 +57,7 @@ identical two-colour raster printed anyway on 2026-09-07 and reached
 ## Physically demonstrated, 2026-09-09
 
 A label requested in Victual, rendered, verified, claimed here and printed on a QL-820NWBc at
-`10.130.30.94` over IPP: the device answered `job-state = 9` (completed) with
+on a local lan over IPP: the device answered `job-state = 9` (completed) with
 `job-impressions-completed = 1`, which is `device_reported` evidence rather than "the bytes
 left here". It scanned back to the location it names, and it measured right way round at the
 size the profile fixes — which settles issue
