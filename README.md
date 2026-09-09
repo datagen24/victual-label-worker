@@ -64,6 +64,21 @@ size the profile fixes — which settles issue
 [#90](https://github.com/datagen24/victual/issues/90)'s rotation sign by a printed label
 rather than by reading.
 
+**Two-colour printed on 2026-09-09 too**, through the whole path rather than from a standalone
+encoder: a filled red band with white text knocked out of it, under a black location name and
+QR — 27,306 red pixels in the artifact, and red on the tape. Red on a QL is a property of the
+**roll** rather than of an ink well: DK-22251 carries a layer that develops red at a different
+temperature, so "two-colour" is a second raster plane the device burns at a different energy.
+That is why the roll and not the artifact's ink decides whether the two-plane stream is sent.
+
+**The version rule caught a change to this document.** Correcting the provenance above altered
+a capability document that had already been registered, and Victual refused the
+re-registration: `A registered driver version is immutable`. The document is `1.1` now, which
+is what ADR-0019 decision item 3 asks for — a worker whose capabilities changed publishes a new
+version. The printer was then moved to it by an explicit revalidating admin action, and the job
+that was queued against `1.0` in between recorded a visible `blocked` attempt naming what was
+missing, with provably zero bytes sent.
+
 Two defects that run found, both in this repository and both fixed before anything printed:
 
 - **Two-colour was read from the artifact's ink rather than from the loaded roll.** A
