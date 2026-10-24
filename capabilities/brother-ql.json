@@ -1,6 +1,6 @@
 {
   "driver_id": "brother.ql",
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "contract_version": 1,
   "discriminator_properties": [
     "model",
@@ -189,7 +189,7 @@
         "resolution_x": 300,
         "resolution_y": 300,
         "color_mode": "black_red",
-        "printable_width_um": 58928,
+        "printable_width_um": 58420,
         "printable_length_um": {
           "min": 12700,
           "max": 254000
@@ -219,7 +219,7 @@
         "resolution_x": 300,
         "resolution_y": 300,
         "color_mode": "black_red",
-        "printable_width_um": 58928,
+        "printable_width_um": 58420,
         "printable_length_um": {
           "min": 12700,
           "max": 254000

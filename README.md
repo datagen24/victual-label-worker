@@ -43,8 +43,17 @@ released repository to Victual's migrations.
 ## Transports
 
 `tcp` — raw port 9100. Constants come from `brother_ql-inventree` 1.3 rather than being
-invented: 90 bytes per row and 400 invalidate bytes from its `models.py`, and 732/696/12/35 for
-label `62` from its `labels.py`. Delivery evidence over this path is `transport`: the device
+invented: 90 bytes per row and 400 invalidate bytes from its `models.py`, and the 35-dot feed
+margin from its `labels.py`. The printable width is not a constant: it is the resolved
+combination's `printable_width_um` at its `resolution_x`, rounded to nearest — the rule Victual's
+profile states — and the band is centred on the 720-dot head.
+
+| Media | Roll | Printable width | Dots at 300 dpi | Blank pins each side | Source |
+|---|---|---|---|---|---|
+| `62` | DK-22205 | 58.928 mm | 696 | 12 | Brother Raster Command Reference, QL-800/810W/820NWB v1.01, 2.3.2 |
+| `62red` | DK-22251 | 58.42 mm | 690 | 15 | measured on a QL-820NWB, 2026-10-24: fixed 1.78 mm side margins |
+
+Schema `1.2` carries the `62red` correction; `1.1` claimed 696 dots for both rolls. Delivery evidence over this path is `transport`: the device
 answers no status request, so *sent* is all it can honestly report.
 
 `ipp` — Internet Printing Protocol. The same byte stream as `application/octet-stream`, which
