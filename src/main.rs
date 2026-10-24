@@ -9,6 +9,7 @@
 
 mod api;
 mod artifact;
+mod capability;
 mod ipp;
 mod ql;
 
@@ -73,10 +74,8 @@ fn main() {
     // once at install: a definition Victual already holds is accepted unchanged, and one that
     // would contradict a stored definition is refused - which is how a worker that shipped a
     // changed capability document finds out here rather than at a device.
-    let capabilities: Value = serde_json::from_str(include_str!("../capabilities/brother-ql.json"))
-        .expect("the embedded capability document parses");
     if let Err(error) = api.register(serde_json::json!({
-        "drivers": [capabilities],
+        "drivers": [capability::document()],
     })) {
         eprintln!("register: {error}");
         std::process::exit(1);
@@ -268,8 +267,14 @@ fn verify(raster: &artifact::Raster, manifest: &Value, printer: &Value) -> Resul
     if raster.width != expected_width {
         return Err(format!("the artifact is {} px wide and its manifest says {expected_width}", raster.width));
     }
-    if raster.width as usize != ql::PRINTABLE_DOTS {
-        return Err(format!("this device prints {} dots across and the artifact is {}; raster/png-indexed;v=1 is fixed_grid, so this is a refusal rather than a resize", ql::PRINTABLE_DOTS, raster.width));
+    // The width is the loaded media's, not one number for every 62 mm roll. An artifact
+    // rendered before a medium's width was corrected - 696 dots on 62red - is refused here
+    // rather than placed: Victual refuses the same reprint at the request (`media_incompatible`),
+    // and this is the claim-time half of that check.
+    let printable = capability::printable_dots(printer)?;
+    if raster.width as usize != printable {
+        return Err(format!("this device prints {printable} dots across {} and the artifact is {}; raster/png-indexed;v=1 is fixed_grid, so this is a refusal rather than a resize",
+            printer["settings"]["media"].as_str().unwrap_or("this media"), raster.width));
     }
     if manifest["form"].as_str() != Some("raster/png-indexed;v=1") {
         return Err(format!("unsupported artifact form {:?}", manifest["form"].as_str()));
@@ -339,10 +344,15 @@ mod tests {
             "dpi_x": 300, "dpi_y": dpi_y, "color_mode": colour_mode})
     }
 
+    /// The printable dots of each medium, as Victual's profile derives them.
+    const RED_DOTS: u32 = 690;
+    const PLAIN_DOTS: u32 = 696;
+
     fn printer(media: &str) -> Value {
+        let colour_mode = if media == "62red" { "black_red" } else { "monochrome" };
         serde_json::json!({"id": 1, "connection": "127.0.0.1:9100", "connection_type": "tcp",
             "model": "QL-820NWBc",
-            "settings": {"media": media, "resolution_x": 300, "resolution_y": 300, "color_mode": "black_red"}})
+            "settings": {"media": media, "resolution_x": 300, "resolution_y": 300, "color_mode": colour_mode}})
     }
 
     /// The assertion this repository owes: an unsupported combination sends nothing.
@@ -353,16 +363,16 @@ mod tests {
     /// leave the connection made.
     #[test]
     fn two_colour_at_600_dpi_sends_zero_bytes() {
-        let art = raster(ql::PRINTABLE_DOTS as u32, 100, true);
-        let refusal = verify(&art, &manifest(ql::PRINTABLE_DOTS as u32, 600, "black_red"), &printer("62red"))
+        let art = raster(RED_DOTS, 100, true);
+        let refusal = verify(&art, &manifest(RED_DOTS, 600, "black_red"), &printer("62red"))
             .expect_err("two colour at 600 dpi does not exist on this device");
         assert!(refusal.contains("600 dpi"), "{refusal}");
     }
 
     #[test]
     fn red_on_monochrome_media_sends_zero_bytes() {
-        let art = raster(ql::PRINTABLE_DOTS as u32, 100, true);
-        let refusal = verify(&art, &manifest(ql::PRINTABLE_DOTS as u32, 300, "black_red"), &printer("62"))
+        let art = raster(PLAIN_DOTS, 100, true);
+        let refusal = verify(&art, &manifest(PLAIN_DOTS, 300, "black_red"), &printer("62"))
             .expect_err("red on 62 is not a combination");
         assert!(refusal.contains("loaded media is 62"), "{refusal}");
     }
@@ -382,8 +392,8 @@ mod tests {
 
     #[test]
     fn a_conforming_monochrome_job_assembles() {
-        let art = raster(ql::PRINTABLE_DOTS as u32, 100, false);
-        verify(&art, &manifest(ql::PRINTABLE_DOTS as u32, 300, "monochrome"), &printer("62")).unwrap();
+        let art = raster(PLAIN_DOTS, 100, false);
+        verify(&art, &manifest(PLAIN_DOTS, 300, "monochrome"), &printer("62")).unwrap();
         let stream = encode(&art, &printer("62"), false).unwrap();
 
         // ESC i a 01 comes before the invalidate as well as after the initialize. A QL
@@ -402,7 +412,7 @@ mod tests {
     /// and a rotation flag to a library that had its own opinion about both.
     #[test]
     fn packing_offsets_without_rotating_or_scaling() {
-        let width = ql::PRINTABLE_DOTS;
+        let width = PLAIN_DOTS as usize;
         let mut ink = vec![false; width * 2];
         ink[0] = true;
         let packed = ql::pack(&ink, width, 2);
@@ -410,7 +420,55 @@ mod tests {
         assert_eq!(packed.0.len(), ql::BYTES_PER_ROW * 2, "one device row per raster row, unscaled");
         let set: Vec<usize> = packed.0.iter().enumerate().filter(|(_, b)| **b != 0).map(|(i, _)| i).collect();
         assert_eq!(set.len(), 1, "one inked pixel becomes one inked byte");
-        // x = 0 lands at device dot 12 (720 - 696 - 12), mirrored to 707, byte 88.
+        // x = 0 lands at device dot 12 ((720 - 696) / 2), mirrored to 707, byte 88.
         assert_eq!(set[0], 88);
+    }
+
+    /// DK-22251's band is 690 dots, inset three dots a side from the 696 one.
+    #[test]
+    fn red_tape_packs_centred_and_three_dots_inside_the_plain_band() {
+        let width = RED_DOTS as usize;
+        let mut ink = vec![false; width];
+        ink[0] = true;
+        ink[width - 1] = true;
+        let packed = ql::pack(&ink, width, 1);
+
+        let dots: Vec<usize> = (0..ql::DEVICE_DOTS)
+            .filter(|dot| packed.0[dot / 8] & (0x80 >> (dot % 8)) != 0)
+            .collect();
+        // x = 0 at device dot 15, mirrored to 704; x = 689 at device dot 704, mirrored to 15.
+        assert_eq!(dots, vec![15, 704]);
+        assert_eq!(dots[0], ql::DEVICE_DOTS - 1 - dots[1], "equal margins either side");
+    }
+
+    #[test]
+    fn red_tape_at_690_dots_assembles() {
+        let art = raster(RED_DOTS, 100, true);
+        verify(&art, &manifest(RED_DOTS, 300, "black_red"), &printer("62red")).unwrap();
+        encode(&art, &printer("62red"), true).unwrap();
+    }
+
+    /// A reprint of an artifact rendered at the old 62red width is refused, not placed.
+    ///
+    /// Victual refuses it first, at the reprint request, because the printer's profile on the
+    /// corrected driver version fixes 690 px (`media_incompatible`). This is the same check at
+    /// claim time, for a job that reached a worker anyway.
+    #[test]
+    fn a_696_dot_artifact_on_red_tape_is_refused() {
+        let art = raster(PLAIN_DOTS, 100, true);
+        let refusal = verify(&art, &manifest(PLAIN_DOTS, 300, "black_red"), &printer("62red"))
+            .expect_err("62red prints 690 dots across");
+        assert!(refusal.contains("690 dots across 62red"), "{refusal}");
+        assert!(refusal.contains("fixed_grid"), "{refusal}");
+    }
+
+    #[test]
+    fn a_printer_outside_the_capability_document_is_refused() {
+        let art = raster(PLAIN_DOTS, 100, false);
+        let mut odd = printer("62");
+        odd["settings"]["resolution_x"] = serde_json::json!(600);
+        let refusal = verify(&art, &manifest(PLAIN_DOTS, 300, "monochrome"), &odd)
+            .expect_err("600 dpi across is not a combination");
+        assert!(refusal.contains("no combination"), "{refusal}");
     }
 }

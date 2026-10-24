@@ -7,12 +7,21 @@
 //!
 //! Constants are taken from `brother_ql-inventree` 1.3 rather than invented — `models.py`
 //! (QL-820NWB: 90 bytes per row, `additional_offset_r` 0, 400 invalidate bytes) and `labels.py`
-//! (`62`: 732 total dots, 696 printable, right margin 12, feed margin 35).
+//! (feed margin 35).
+//!
+//! **The printable band follows the media.** It used to be that library's label `62` — 696
+//! dots with 12 pins either side — for every 62 mm roll. That is Brother's figure for DK-22205
+//! (Raster Command Reference, QL-800/810W/820NWB v1.01, 2.3.2: 58.9 mm, 696 dots), and it is
+//! three dots a side too wide for DK-22251, which the maintainer measured on 2026-10-24 at a
+//! fixed 1.78 mm either side: 58.42 mm, 690 dots. The width now comes from the combination's
+//! `printable_width_um` in the capability document (`capability::printable_dots`), and the band
+//! is centred on the 720-dot head, where a centred roll's equal side margins put it: 12 pins
+//! either side for 696, 15 for 690.
 //!
 //! **Issue #90 is designed out rather than fixed here.** The defect was authoring an image
 //! against `dots_total` and letting the library resize it to `dots_printable`. This never
-//! resizes: the renderer produces exactly `PRINTABLE_DOTS` across, and the only placement is a
-//! whole-pixel offset into the device row. There is also one rotation authority, because there
+//! resizes: the renderer produces exactly the profile's printable dots across, and the only
+//! placement is a whole-pixel offset into the device row. There is also one rotation authority, because there
 //! is no rotation — the renderer already draws x across the tape and y along the feed, which is
 //! the raster's own layout.
 
@@ -22,8 +31,6 @@ use std::time::Duration;
 
 pub const BYTES_PER_ROW: usize = 90; // QL-820NWB
 pub const DEVICE_DOTS: usize = BYTES_PER_ROW * 8; // 720
-pub const PRINTABLE_DOTS: usize = 696; // label "62"
-pub const RIGHT_MARGIN_DOTS: usize = 12; // label "62" + additional_offset_r 0
 pub const FEED_MARGIN: u16 = 35;
 const INVALIDATE_BYTES: usize = 400;
 
@@ -52,13 +59,20 @@ impl Default for Job {
 /// One raster plane: `rows` rows of `BYTES_PER_ROW`, bit set = ink.
 pub struct Plane(pub Vec<u8>);
 
+/// The pins left blank before a band `printable` dots wide, centred on the head.
+pub fn offset(printable: usize) -> usize {
+    assert!(printable <= DEVICE_DOTS && (DEVICE_DOTS - printable).is_multiple_of(2),
+        "a {printable}-dot band does not centre on a {DEVICE_DOTS}-dot head");
+    (DEVICE_DOTS - printable) / 2
+}
+
 /// Pack an ink mask into device rows.
 ///
-/// `ink[y * PRINTABLE_DOTS + x]` is true where the label is inked. The bit order is reversed
-/// within each byte, which is what `brother_ql`'s `FLIP_LEFT_RIGHT` before packing amounts to.
+/// `ink[y * width + x]` is true where the label is inked, and `width` is the media's printable
+/// dots, already checked against the profile by `verify`. The bit order is reversed within each
+/// byte, which is what `brother_ql`'s `FLIP_LEFT_RIGHT` before packing amounts to.
 pub fn pack(ink: &[bool], width: usize, height: usize) -> Plane {
-    assert_eq!(width, PRINTABLE_DOTS, "the renderer must author at dots_printable");
-    let offset = DEVICE_DOTS - PRINTABLE_DOTS - RIGHT_MARGIN_DOTS; // 12
+    let offset = offset(width); // 12 for 696, 15 for 690
     let mut out = vec![0u8; BYTES_PER_ROW * height];
     for y in 0..height {
         for x in 0..width {
