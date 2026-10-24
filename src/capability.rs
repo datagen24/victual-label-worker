@@ -46,7 +46,13 @@ pub fn printable_dots(printer: &Value) -> Result<usize, String> {
     };
     let width = entry["printable_width_um"].as_u64().ok_or("the combination states no printable_width_um")?;
     let dpi = entry["resolution_x"].as_u64().ok_or("the combination states no resolution_x")?;
-    Ok(dots(width, dpi))
+    let printable = dots(width, dpi);
+    // `ql::pack` centres the band on the head and asserts that it can; refusing here keeps
+    // that assertion from aborting the process in the middle of an attempt.
+    if printable > crate::ql::DEVICE_DOTS || !(crate::ql::DEVICE_DOTS - printable).is_multiple_of(2) {
+        return Err(format!("a {printable}-dot band does not centre on the {}-dot head", crate::ql::DEVICE_DOTS));
+    }
+    Ok(printable)
 }
 
 #[cfg(test)]
